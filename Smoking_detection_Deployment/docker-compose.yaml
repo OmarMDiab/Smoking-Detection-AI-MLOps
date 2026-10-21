@@ -1,0 +1,44 @@
+services:
+  flask_ui:
+    build:
+      context: ./Flask_UI
+      dockerfile: flask.dockerfile
+    container_name: smoking_detection_ui
+    ports:
+      - "5000:5000"
+    environment:
+      - AI_WORKER_URL=http://ai_worker:8001
+      - DATA_DIR=/data
+    volumes:
+      - ./data:/data
+    depends_on:
+      ai_worker:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ai_worker:
+    build:
+      context: ./AI_Worker
+      dockerfile: ai_worker.dockerfile
+    container_name: smoking_detection_worker
+    expose:
+      - "8001"
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - ./data:/data
+      - ./Model/weights:/app/Model/weights:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped

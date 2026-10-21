@@ -1,0 +1,21 @@
+# ByteTrack config tuned for this project: a single small, fast-moving
+# object (a held cigarette) that frequently disappears briefly behind
+# fingers or rotates out of the detector's recognizable silhouette.
+# Defaults (track_buffer=30, match_thresh=0.8) are tuned for
+# pedestrian/vehicle tracking with near-continuous visibility and cause
+# a new track ID to be spawned after ~1.2s of occlusion — far shorter
+# than the occlusion gaps (~1-1.5s) observed with a hand rotating a
+# cigarette. See model/detector.py for how this is used.
+
+tracker_type: bytetrack
+track_high_thresh: 0.3      # min conf to count a detection as "high confidence" for first-pass association / new tracks
+track_low_thresh: 0.1       # min conf for the second-pass association that keeps an already-confirmed track alive
+                            # through a dip in confidence (hand rotating the cigarette, motion blur, etc) instead
+                            # of dropping it and spawning a new ID when it recovers
+new_track_thresh: 0.3       # min conf to spawn a brand-new track id — kept well above track_low_thresh so a
+                            # momentary low-confidence blip never gets mistaken for a *new* cigarette
+track_buffer: 150           # ~6s at 25fps; keeps a lost track alive through long hand-occlusion/rotation gaps
+match_thresh: 0.9           # tightened from default 0.8 — measured to cut spurious ID switches (13->8 unique
+                            # IDs on validation clip) by requiring a closer IoU match between predicted and
+                            # detected boxes before associating them to the same track
+fuse_score: True

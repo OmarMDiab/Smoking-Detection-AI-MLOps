@@ -1,0 +1,37 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Vendored binaries - too large for GitHub (>100MB) and not needed:
+# code falls back to system ffmpeg / Docker's apt-installed ffmpeg if absent.
+**/bin/ffmpeg.exe
+**/bin/*.exe
+
+# Kept local-only, not published to the remote repo
+Assets/Smoking Detection (Omar Diab).pptx
+
+# Runtime data - recreated automatically by the apps on startup
+Smoking_detection_Deployment/data/uploads/
+Smoking_detection_Deployment/data/results/
+Smoking_Detection_Prototype/Flask_UI/uploads/
+Smoking_Detection_Prototype/Flask_UI/results/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Env / secrets
+.env
+*.env
+.env.*
+
+# OS
+Thumbs.db
+.DS_Store

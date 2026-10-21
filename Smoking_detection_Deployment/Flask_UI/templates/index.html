@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Petroleum Safety AI System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#e8a020"/>
+          <path d="M2 17l10 5 10-5" stroke="#e8a020" stroke-width="2" stroke-linecap="round"/>
+          <path d="M2 12l10 5 10-5" stroke="rgba(232,160,32,0.5)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">Smoke<em>Safe</em></span>
+        <span class="brand-sub">Petroleum Safety Intelligence</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill" id="systemStatus">
+        <span class="pulse-dot"></span>
+        System Ready
+      </div>
+      <div class="topbar-meta">AI · YOLO26s</div>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <main class="workspace">
+
+    <!-- LEFT PANEL: UPLOAD -->
+    <section class="panel panel-upload">
+
+      <div class="panel-header">
+        <div class="panel-icon upload-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div>
+          <div class="panel-title">Media Upload</div>
+          <div class="panel-sub">Image or video · Any format</div>
+        </div>
+      </div>
+
+      <!-- DROP ZONE -->
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*,video/*" />
+        <!-- Empty state -->
+        <div class="dz-inner" id="dzEmpty">
+          <div class="dz-icon-wrap">
+            <svg class="dz-icon" viewBox="0 0 64 64" fill="none">
+              <rect x="28" y="8" width="8" height="32" rx="2" fill="#003366" opacity="0.12"/>
+              <polygon points="32,4 20,40 44,40" fill="#003366" opacity="0.08"/>
+              <rect x="18" y="40" width="28" height="4" rx="2" fill="#003366" opacity="0.15"/>
+              <rect x="22" y="44" width="4" height="10" rx="1" fill="#003366" opacity="0.12"/>
+              <rect x="38" y="44" width="4" height="10" rx="1" fill="#003366" opacity="0.12"/>
+              <circle cx="32" cy="30" r="12" fill="#e8a020" opacity="0.15"/>
+              <path d="M32 36v-10M28 30l4-4 4 4" stroke="#e8a020" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <p class="dz-title">Drop your file here</p>
+          <p class="dz-sub">or <span class="dz-browse">click to browse</span></p>
+          <div class="dz-formats">
+            <span class="fmt-tag">JPG</span><span class="fmt-tag">PNG</span><span class="fmt-tag">BMP</span>
+            <span class="fmt-tag">WEBP</span><span class="fmt-tag">MP4</span><span class="fmt-tag">AVI</span>
+            <span class="fmt-tag">MOV</span><span class="fmt-tag">MKV</span><span class="fmt-tag">+more</span>
+          </div>
+        </div>
+        <!-- Preview state -->
+        <div class="dz-preview" id="dzPreview">
+          <button class="dz-clear-btn" id="fileClear" title="Remove file">✕</button>
+          <img id="previewImg" src="" alt="" />
+          <video id="previewVid" muted playsinline loop></video>
+          <div class="dz-preview-info">
+            <span class="dz-preview-name" id="fileInfoName"></span>
+            <span class="dz-preview-size" id="fileInfoSize"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ERROR -->
+      <div class="error-box" id="errorBox"></div>
+
+      <!-- PROGRESS -->
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-header">
+          <span id="progressLabel">Uploading…</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <!-- OPTIONS -->
+      <label class="option-toggle" for="requireHumanToggle">
+        <input type="checkbox" id="requireHumanToggle" />
+        <span class="option-toggle-switch"></span>
+        <span class="option-toggle-text">
+          <span class="option-toggle-title">Only count cigarettes held by a person</span>
+          <span class="option-toggle-sub">Reduces false alarms on cigarette-shaped objects (e.g. pipes) when nobody is holding them. Uses body-pose detection, so it still works with gloves.</span>
+        </span>
+      </label>
+
+      <!-- ACTION -->
+      <button class="btn-scan" id="detectBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Run Violation Scan
+      </button>
+
+      <!-- SPECS -->
+      <div class="spec-row">
+        <div class="spec-item"><span class="spec-k">Model</span><span class="spec-v">YOLO26s</span></div>
+        <div class="spec-item"><span class="spec-k">Img Size</span><span class="spec-v">1280 px</span></div>
+        <div class="spec-item"><span class="spec-k">Threshold</span><span class="spec-v">0.25</span></div>
+      </div>
+
+    </section>
+
+    <!-- DIVIDER -->
+    <div class="panel-divider">
+      <div class="divider-line"></div>
+      <div class="divider-badge">AI</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <!-- RIGHT PANEL: RESULTS -->
+    <section class="panel panel-results" id="panelResults">
+
+      <!-- IDLE STATE -->
+      <div class="idle-state" id="idleState">
+        <div class="idle-graphic">
+          <svg viewBox="0 0 120 120" fill="none" class="idle-svg">
+            <circle cx="60" cy="60" r="54" stroke="#dde3ec" stroke-width="2" stroke-dasharray="6 4"/>
+            <circle cx="60" cy="60" r="36" fill="#f5f7fa"/>
+            <path d="M44 60h32M60 44v32" stroke="#dde3ec" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="60" cy="60" r="6" fill="#dde3ec"/>
+            <!-- hard hat -->
+            <ellipse cx="60" cy="38" rx="14" ry="8" fill="#e8a020" opacity="0.25"/>
+            <rect x="50" y="36" width="20" height="5" rx="2.5" fill="#e8a020" opacity="0.35"/>
+          </svg>
+        </div>
+        <p class="idle-title">Awaiting Analysis</p>
+        <p class="idle-sub">Upload an image or video on the left,<br/>then run the violation scan.</p>
+      </div>
+
+      <!-- RESULTS STATE (hidden until scan) -->
+      <div class="results-state" id="resultsState">
+
+        <div class="results-header">
+          <div class="panel-header">
+            <div class="panel-icon results-icon" id="resultsIcon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+            <div>
+              <div class="panel-title">Scan Results</div>
+              <div class="panel-sub" id="resultsMeta">—</div>
+            </div>
+          </div>
+          <a class="btn-download" id="downloadLink" href="#" download>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download
+          </a>
+        </div>
+
+        <!-- STATS (image results — detailed per-detection grid) -->
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <!-- ALERT BANNER (video results — single prominent status banner) -->
+        <div class="alert-banner" id="alertBanner" style="display:none;"></div>
+
+        <!-- MEDIA -->
+        <div class="media-frame" id="mediaFrame"></div>
+
+        <!-- DETECTIONS LIST -->
+        <div class="det-list" id="detList"></div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span>Petroleum Safety AI System © 2025</span>
+    <span class="footer-sep">·</span>
+    <span>Petroleum Workplace Safety</span>
+    <span class="footer-sep">·</span>
+    <span>Powered by <strong>YOLO26s</strong> &amp; Flask</span>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
