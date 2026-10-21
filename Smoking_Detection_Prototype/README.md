@@ -1,28 +1,28 @@
 # Smoking Detection — Prototype
 
-Single-process Flask application implementing the full detection pipeline in-process. This is the development/experimentation variant of the project — see the [root README](../README.md) for the overall project and the [Deployment docs](../Smoking_detection_Deployment/README.md) for the containerized variant.
+Single-process Flask app running the full detection pipeline in-process — the development/experimentation variant. See the [root README](../README.md) for the project and the [Deployment docs](../Smoking_detection_Deployment/README.md) for the containerized variant.
 
 ## Prototype Purpose
 
-This directory is a self-contained reference implementation: one Flask process that serves the web UI, receives uploads, and calls the detection/tracking/pose code directly in Python — no network hop, no separate worker service. It's the fastest way to iterate on the model pipeline itself: edit [`model/detector.py`](Flask_UI/model/detector.py) and restart the Flask dev server to see the effect immediately.
+One Flask process serves the UI, receives uploads, and calls the detection/tracking/pose code directly in Python — no network hop, no worker service. Edit [`model/detector.py`](Flask_UI/model/detector.py) and restart to see changes immediately.
 
 ## AI Pipeline
 
 ![YOLO26s detection, ByteTrack ID, and MediaPipe Pose skeleton overlay on the same frame](../Assets/Adding_tracker_and_mediapipe.png)
 
-_Left: raw YOLO26s detection. Right: the same detection with a persistent ByteTrack ID and the optional MediaPipe Pose skeleton overlay drawn when `require_human` is enabled._
+_Raw YOLO26s detection (left) → ByteTrack ID + optional MediaPipe Pose skeleton (right)._
 
-Processing stages, in order (see [`model/detector.py`](Flask_UI/model/detector.py)):
+Stages, in order (see [`model/detector.py`](Flask_UI/model/detector.py)):
 
-1. **Upload** — `app.py`'s `/api/detect` receives an image or video file.
-2. **Detection** — `model/detector.py` runs YOLO26s (`predict()` for images, `track()` for video) at `imgsz=1280`, `iou=0.5`.
-3. **Tracking** (video only) — ByteTrack assigns persistent IDs across frames, followed by a custom `_stitch_track_ids()` pass that merges IDs likely belonging to the same physical cigarette after an occlusion gap.
-4. **Optional MediaPipe Pose gating** — if `require_human` is enabled, only detections falling inside a tracked person's mouth/hand region are kept, and a reduced pose skeleton is drawn.
-5. **Visualization** — bounding boxes (and the pose skeleton, if enabled) are drawn on the frame(s).
-6. **Video only: ffmpeg re-encode** — the raw OpenCV output is re-encoded to a browser-playable `.mp4` (falls back to serving the raw file if ffmpeg is unavailable).
-7. **Output** — the annotated image/video is saved to `results/` and detection stats are returned as JSON.
+1. **Upload** — `app.py`'s `/api/detect` receives an image/video.
+2. **Detect** — YOLO26s `predict()` (image) or `track()` (video), `imgsz=1280`, `iou=0.5`.
+3. **Track** (video only) — ByteTrack assigns IDs; a custom `_stitch_track_ids()` pass merges IDs split by an occlusion gap.
+4. **Pose gate** (optional) — if `require_human`, keep only detections near a tracked person's mouth/hand; draw a reduced skeleton.
+5. **Draw** boxes (and skeleton, if enabled).
+6. **Video only** — ffmpeg re-encodes to a browser-playable `.mp4`.
+7. **Output** — saved to `results/`, stats returned as JSON.
 
-Single images never go through ByteTrack (there's nothing to track across frames); only video jobs run the tracking, ID-stitching, and ffmpeg steps.
+Images skip ByteTrack entirely — there's nothing to track across a single frame.
 
 ## Model Information
 
@@ -51,28 +51,24 @@ Single images never go through ByteTrack (there's nothing to track across frames
 | `track_buffer`      | 150 (~6s @ 25fps) | Keeps a lost track alive through long hand-occlusion/rotation gaps                        |
 | `match_thresh`      | 0.9               | Tightened from the default 0.8; measured to cut spurious ID switches on a validation clip |
 
-On top of ByteTrack itself, `detector.py` runs a custom `_stitch_track_ids()` post-processing pass that merges track IDs likely belonging to the same physical cigarette after a tracking gap (e.g. reacquired after being hidden by a rotating hand), using positional proximity and — when pose tracking is enabled — shared tracked-person identity as a stronger merge signal.
+A custom `_stitch_track_ids()` pass also merges IDs likely belonging to the same cigarette after an occlusion gap, using position and (if pose is on) shared tracked-person identity.
 
-**MediaPipe** is optional and is **Pose only** (`pose_landmarker_lite.task`), toggled per-request via the `require_human` flag (exposed in the UI as the **"Only count cigarettes held by a person"** checkbox):
+**MediaPipe** is optional, **Pose only** (`pose_landmarker_lite.task`), toggled via the UI's **"Only count cigarettes held by a person"** checkbox (`require_human`):
 
-- When **on**: MediaPipe Pose estimates body keypoints; a cigarette detection only counts if its center falls inside a small region around a tracked person's mouth or either hand. A reduced "Kinect-style" skeleton is also drawn for visualization.
-- When **off** (default): plain YOLO26s detection/tracking, with no pose estimation at all.
-- Code comments explain the Pose-over-Hands choice explicitly: MediaPipe Hands was tried and **failed completely on gloved hands** (0 detections in testing), so Pose (which infers from body silhouette) is used instead.
-- **Note:** `mediapipe_models/hand_landmarker.task` ships in this repository but is **not referenced by any current code path** — it appears to be left over from that earlier, abandoned approach.
+- **On:** keeps only detections inside a tracked person's mouth/hand region; draws a reduced skeleton.
+- **Off** (default): plain detection/tracking, no pose estimation.
+- MediaPipe Hands was tried and dropped — it failed on gloved hands, so Pose (body silhouette) is used instead.
+- `mediapipe_models/hand_landmarker.task` ships in the repo but **isn't used by any current code path** — leftover from that abandoned approach.
 
 ## Dataset and Training
 
-Training happened entirely in [`Yolo26s Training (kaggle).ipynb`](../Yolo26s%20Training%20%28kaggle%29.ipynb) (run on Kaggle, not in this folder).
+Trained entirely in [`Yolo26s Training (kaggle).ipynb`](../Yolo26s%20Training%20%28kaggle%29.ipynb) on Kaggle (not in this folder).
 
 ![Dataset overview: single-class cigarette dataset, train/val/test split](../Assets/Dataset_overview.png)
 
-Summary:
-
-- **Dataset:** single class `cigarette`, 12,259 training images (120 background/negative images included) and 1,152 validation images (88 backgrounds), sourced from a Kaggle dataset (`cigarette-detection`, owner `omarmdiab`) and copied to local SSD storage for faster I/O during training.
-- **Base checkpoint:** `yolo26s.pt`, fine-tuned for up to 60 epochs at 640×640, batch size 32, on 2 GPUs. Training early-stopped at **epoch 37** (no improvement for 15 epochs).
-- **Reported validation metrics:** Precision 0.822, Recall 0.794, mAP@50 0.838, mAP@50–95 0.495 (consistent with the project presentation's rounded 82.5% / 79.0% / 83.8% / 49.5%). Inference speed measured at 5.0 ms/image (model forward pass only) in that same Kaggle notebook environment — see the [root README](../README.md#model-training--evaluation) for the full breakdown and caveats.
-
-Do not add dataset images, label files, or model weights directly as documentation examples — refer to the dataset by name/owner and to the weight file by path instead, as done above.
+- **Dataset:** [cigarette detection](https://platform.ultralytics.com/ahmed-aboubakr/datasets/cigarette-detection1) (Ultralytics Platform), single class `cigarette`, 14,309 images — 12,259 train / 1,152 val / 898 test.
+- **Training:** `yolo26s.pt` base, up to 60 epochs @ 640×640, batch 32, 2 GPUs. Early-stopped at **epoch 37**.
+- **Validation metrics:** Precision 0.822, Recall 0.794, mAP@50 0.838, mAP@50–95 0.495 — see the [root README](../README.md#model-training--evaluation) for the full breakdown and caveats.
 
 ## Installation and Execution
 
@@ -82,18 +78,17 @@ pip install -r requirements.txt       # flask, ultralytics, opencv-python, numpy
 python app.py
 ```
 
-Then open http://localhost:5000.
+Open http://localhost:5000.
 
-- **Python version:** not independently pinned in this variant; 3.11 is recommended for parity with the Deployment variant's Docker images.
-- **Model weights:** `../Model/weights/best.pt` is already included in the repository — no download step needed.
-- **ffmpeg:** `bin/ffmpeg.exe` is **not included in the repository** (excluded for its size). This only affects Windows: `app.py` looks for `bin/ffmpeg.exe` first, then a conda environment's `ffmpeg.exe`, then `ffmpeg` on `PATH`. If none is found, video results are still produced — just served as the raw OpenCV-encoded `.mp4` instead of a browser-optimized re-encode (which may not play in all browsers).
-- **Enabling pose gating:** there's no separate CLI flag — check the "Only count cigarettes held by a person" box in the web UI before running a scan (sent as a `require_human` form field).
-- **Upload limit:** 500 MB (`MAX_CONTENT_LENGTH` in `app.py`).
-- This repo's `.vscode/settings.json` defaults to a conda environment manager if you prefer conda over `venv`/`pip` directly — no `environment.yml` is provided, so `requirements.txt` is still the source of truth for dependencies either way.
+- **Python:** not pinned here; 3.11 recommended (matches Deployment's Docker images).
+- **Weights:** `Model/weights/best.pt` already included — no download needed.
+- **ffmpeg:** `bin/ffmpeg.exe` is **not in the repo** (size). On Windows, `app.py` falls back to a conda env's ffmpeg, then `PATH`; if none found, video still works but serves the raw, non-browser-optimized file.
+- **Pose gating:** toggle the "Only count cigarettes held by a person" checkbox in the UI — no CLI flag.
+- **Upload limit:** 500 MB (`MAX_CONTENT_LENGTH`).
 
 ## Configuration Reference
 
-These are Python constants in [`model/detector.py`](Flask_UI/model/detector.py) — there is no environment-variable or CLI override in the Prototype variant; change the source and restart to adjust them.
+Python constants in [`model/detector.py`](Flask_UI/model/detector.py) — no env var/CLI override; edit source + restart.
 
 | Constant                                                     | Value     | Purpose                                                                                               |
 | ------------------------------------------------------------ | --------- | ----------------------------------------------------------------------------------------------------- |
@@ -107,28 +102,21 @@ These are Python constants in [`model/detector.py`](Flask_UI/model/detector.py) 
 
 ## Outputs and Troubleshooting
 
-- **Image result:** `results/<uid>_result.<ext>` plus a JSON response `{"detections": [...], "count": N}`, each detection shaped as `{"label", "confidence", "bbox": [x1, y1, x2, y2]}`.
-- **Video result:** `results/<uid>_result.mp4` (raw) and, if the ffmpeg re-encode succeeds, `results/<uid>_web.mp4` (browser-playable) — the UI serves whichever one succeeded. JSON response: `{"total_frames", "frames_with_smoking", "total_detections", "unique_smokers"}`.
-  - **`unique_smokers` is the number of distinct stitched ByteTrack cigarette tracks**, not an independently verified count of unique people — for example, two people who are never tracked simultaneously but whose cigarettes get merged by the ID-stitching heuristic would undercount.
-- **Common issues:**
-  - _Model file not found_ — ensure `Model/weights/best.pt` exists relative to the project root (already included in this repo).
-  - _Video plays with no sound / won't play in-browser_ — ffmpeg wasn't found; the raw `mp4v` file was served instead (see [Installation](#installation-and-execution)).
-  - _Pose gating misses a smoker_ — pose estimation needs a reasonably visible mouth/hand; heavy occlusion, extreme angles, or multiple overlapping people can cause misses.
+- **Image:** `results/<uid>_result.<ext>` + JSON `{"detections": [...], "count": N}`.
+- **Video:** `results/<uid>_result.mp4` (raw), plus `<uid>_web.mp4` if the ffmpeg re-encode succeeds. JSON: `{"total_frames", "frames_with_smoking", "total_detections", "unique_smokers"}`.
+  - `unique_smokers` = distinct **stitched ByteTrack tracks**, not an independently verified count of people.
+- **Model file not found** — check `Model/weights/best.pt` exists.
+- **Video won't play / no sound** — ffmpeg wasn't found; raw `mp4v` was served instead.
+- **Pose gating misses a smoker** — needs a reasonably visible mouth/hand; heavy occlusion or odd angles can cause misses.
 
 ## Development and Testing
 
-There is no automated test suite in this repository (no `pytest`/`unittest` files, no CI workflow). To validate changes manually:
-
-1. Run the app locally (`python app.py`).
-2. Upload the sample media from [`../Testing_Samples/Images`](../Testing_Samples/Images) and [`../Testing_Samples/Vidoes`](../Testing_Samples/Vidoes) through the UI.
-3. Visually inspect the annotated output and the returned detection stats, with and without the "require human" toggle.
-
-Adding an automated test suite is a manual, not yet implemented, suggestion — there is currently no tooling for it in this repo.
+No automated test suite (no `pytest`/CI). To validate changes manually: run the app, upload samples from [`../Testing_Samples/Images`](../Testing_Samples/Images) / [`../Testing_Samples/Vidoes`](../Testing_Samples/Vidoes), and visually check detections with and without "require human" on.
 
 ## Limitations and Next Steps
 
-- Cigarettes remain a small, easily-occluded target; detection quality degrades with distance, poor lighting, and partial occlusion by hands/smoke.
-- False positives on other small, elongated objects (pens, lighters, tools) are possible — the `require_human` toggle reduces but does not eliminate this.
-- No temporal-consistency/minimum-duration gate exists before a tracked cigarette counts in `unique_smokers` — a track that ByteTrack confirms still counts even if briefly seen.
-- The model has not been evaluated on real petroleum/industrial-site CCTV footage.
-- Higher-resolution **training** (e.g. 960px, vs. the current 640px) is a candidate improvement, distinct from the 1280px inference resolution already in use.
+- Small, easily-occluded target — quality drops with distance, poor lighting, occlusion.
+- False positives possible on other small elongated objects (pens, lighters, tools).
+- No temporal-consistency gate — a single confirmed track counts, however brief.
+- Not evaluated on real petroleum/industrial CCTV footage.
+- Higher-resolution **training** (e.g. 960px) remains a candidate improvement, separate from the 1280px inference already in use.
