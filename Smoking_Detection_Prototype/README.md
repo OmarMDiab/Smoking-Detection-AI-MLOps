@@ -8,50 +8,48 @@ This directory is a self-contained reference implementation: one Flask process t
 
 ## AI Pipeline
 
-```mermaid
-flowchart TD
-    A["Upload: image or video"] --> B["app.py /api/detect"]
-    B --> C["model/detector.py"]
-    C --> D["YOLO26s predict/track<br/>imgsz=1280, iou=0.5"]
-    D --> E{"Video?"}
-    E -->|"yes"| F["ByteTrack tracking<br/>+ custom ID-stitching"]
-    E -->|"no"| H["Draw boxes<br/>+ skeleton if enabled"]
-    F --> G{"require_human?"}
-    G -->|"yes"| I["MediaPipe Pose<br/>keep human-held only"]
-    G -->|"no"| H
-    I --> H
-    H --> J["Video only:<br/>ffmpeg re-encode"]
-    J --> K["Save to results/<br/>return JSON"]
-```
+![YOLO26s detection, ByteTrack ID, and MediaPipe Pose skeleton overlay on the same frame](../Assets/Adding_tracker_and_mediapipe.png)
+
+_Left: raw YOLO26s detection. Right: the same detection with a persistent ByteTrack ID and the optional MediaPipe Pose skeleton overlay drawn when `require_human` is enabled._
+
+Processing stages, in order (see [`model/detector.py`](Flask_UI/model/detector.py)):
+
+1. **Upload** — `app.py`'s `/api/detect` receives an image or video file.
+2. **Detection** — `model/detector.py` runs YOLO26s (`predict()` for images, `track()` for video) at `imgsz=1280`, `iou=0.5`.
+3. **Tracking** (video only) — ByteTrack assigns persistent IDs across frames, followed by a custom `_stitch_track_ids()` pass that merges IDs likely belonging to the same physical cigarette after an occlusion gap.
+4. **Optional MediaPipe Pose gating** — if `require_human` is enabled, only detections falling inside a tracked person's mouth/hand region are kept, and a reduced pose skeleton is drawn.
+5. **Visualization** — bounding boxes (and the pose skeleton, if enabled) are drawn on the frame(s).
+6. **Video only: ffmpeg re-encode** — the raw OpenCV output is re-encoded to a browser-playable `.mp4` (falls back to serving the raw file if ffmpeg is unavailable).
+7. **Output** — the annotated image/video is saved to `results/` and detection stats are returned as JSON.
 
 Single images never go through ByteTrack (there's nothing to track across frames); only video jobs run the tracking, ID-stitching, and ffmpeg steps.
 
 ## Model Information
 
-| | |
-|---|---|
-| Architecture | YOLO26s (Ultralytics), fine-tuned, single class `cigarette` |
-| Weight file | [`Model/weights/best.pt`](../Smoking_Detection_Prototype/Model/weights/best.pt) (already included in the repo, relative to the `Smoking_Detection_Prototype/` folder) |
-| Path resolution | Hardcoded in `detector.py`: `<this file>/../../../Model/weights/best.pt`, i.e. `Smoking_Detection_Prototype/Model/weights/best.pt` |
-| Training resolution | 640×640 (see the [training notebook](../Yolo26s%20Training%20%28kaggle%29.ipynb)) |
-| **Inference resolution** | **1280×1280** (`IMG_SIZE` in `detector.py`) — higher than the training resolution, to give the small `cigarette` class more pixels |
-| Confidence threshold | `0.25` for single images (`CONF_THRESHOLD`); `0.1` for video frames fed into ByteTrack (`TRACK_CONF_THRESHOLD`, see [below](#bytetrack-and-mediapipe)) |
-| NMS IoU threshold | `0.5` (`NMS_IOU`) — tightened from Ultralytics' default `0.7` to collapse duplicate overlapping boxes observed on real footage |
-| Precision | FP16 (`quantize=16`) automatically when CUDA is available, FP32 otherwise |
-| Classes | Single class: `cigarette` (`nc: 1` in the training `data.yaml`) |
-| Loading | `ultralytics.YOLO(MODEL_PATH)`, lazily instantiated once as a module-level singleton (`get_model()`) |
+|                          |                                                                                                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture             | YOLO26s (Ultralytics), fine-tuned, single class `cigarette`                                                                                                           |
+| Weight file              | [`Model/weights/best.pt`](../Smoking_Detection_Prototype/Model/weights/best.pt) (already included in the repo, relative to the `Smoking_Detection_Prototype/` folder) |
+| Path resolution          | Hardcoded in `detector.py`: `<this file>/../../../Model/weights/best.pt`, i.e. `Smoking_Detection_Prototype/Model/weights/best.pt`                                    |
+| Training resolution      | 640×640 (see the [training notebook](../Yolo26s%20Training%20%28kaggle%29.ipynb))                                                                                     |
+| **Inference resolution** | **1280×1280** (`IMG_SIZE` in `detector.py`) — higher than the training resolution, to give the small `cigarette` class more pixels                                    |
+| Confidence threshold     | `0.25` for single images (`CONF_THRESHOLD`); `0.1` for video frames fed into ByteTrack (`TRACK_CONF_THRESHOLD`, see [below](#bytetrack-and-mediapipe))                |
+| NMS IoU threshold        | `0.5` (`NMS_IOU`) — tightened from Ultralytics' default `0.7` to collapse duplicate overlapping boxes observed on real footage                                        |
+| Precision                | FP16 (`quantize=16`) automatically when CUDA is available, FP32 otherwise                                                                                             |
+| Classes                  | Single class: `cigarette` (`nc: 1` in the training `data.yaml`)                                                                                                       |
+| Loading                  | `ultralytics.YOLO(MODEL_PATH)`, lazily instantiated once as a module-level singleton (`get_model()`)                                                                  |
 
 ## ByteTrack and MediaPipe
 
 **ByteTrack** (video only) uses a custom config, [`model/trackers/bytetrack_custom.yaml`](Flask_UI/model/trackers/bytetrack_custom.yaml), tuned for a single small, fast-moving object that frequently disappears behind fingers:
 
-| Parameter | Value | Why |
-|---|---|---|
-| `track_high_thresh` | 0.3 | Min confidence for first-pass association / starting a track |
-| `track_low_thresh` | 0.1 | Min confidence to keep an already-confirmed track alive through a confidence dip |
-| `new_track_thresh` | 0.3 | Min confidence to spawn a brand-new track ID |
-| `track_buffer` | 150 (~6s @ 25fps) | Keeps a lost track alive through long hand-occlusion/rotation gaps |
-| `match_thresh` | 0.9 | Tightened from the default 0.8; measured to cut spurious ID switches on a validation clip |
+| Parameter           | Value             | Why                                                                                       |
+| ------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| `track_high_thresh` | 0.3               | Min confidence for first-pass association / starting a track                              |
+| `track_low_thresh`  | 0.1               | Min confidence to keep an already-confirmed track alive through a confidence dip          |
+| `new_track_thresh`  | 0.3               | Min confidence to spawn a brand-new track ID                                              |
+| `track_buffer`      | 150 (~6s @ 25fps) | Keeps a lost track alive through long hand-occlusion/rotation gaps                        |
+| `match_thresh`      | 0.9               | Tightened from the default 0.8; measured to cut spurious ID switches on a validation clip |
 
 On top of ByteTrack itself, `detector.py` runs a custom `_stitch_track_ids()` post-processing pass that merges track IDs likely belonging to the same physical cigarette after a tracking gap (e.g. reacquired after being hidden by a rotating hand), using positional proximity and — when pose tracking is enabled — shared tracked-person identity as a stronger merge signal.
 
@@ -64,7 +62,11 @@ On top of ByteTrack itself, `detector.py` runs a custom `_stitch_track_ids()` po
 
 ## Dataset and Training
 
-Training happened entirely in [`Yolo26s Training (kaggle).ipynb`](../Yolo26s%20Training%20%28kaggle%29.ipynb) (run on Kaggle, not in this folder). Summary:
+Training happened entirely in [`Yolo26s Training (kaggle).ipynb`](../Yolo26s%20Training%20%28kaggle%29.ipynb) (run on Kaggle, not in this folder).
+
+![Dataset overview: single-class cigarette dataset, train/val/test split](../Assets/Dataset_overview.png)
+
+Summary:
 
 - **Dataset:** single class `cigarette`, 12,259 training images (120 background/negative images included) and 1,152 validation images (88 backgrounds), sourced from a Kaggle dataset (`cigarette-detection`, owner `omarmdiab`) and copied to local SSD storage for faster I/O during training.
 - **Base checkpoint:** `yolo26s.pt`, fine-tuned for up to 60 epochs at 640×640, batch size 32, on 2 GPUs. Training early-stopped at **epoch 37** (no improvement for 15 epochs).
@@ -93,15 +95,15 @@ Then open http://localhost:5000.
 
 These are Python constants in [`model/detector.py`](Flask_UI/model/detector.py) — there is no environment-variable or CLI override in the Prototype variant; change the source and restart to adjust them.
 
-| Constant | Value | Purpose |
-|---|---|---|
-| `CONF_THRESHOLD` | 0.25 | Confidence threshold for single-image detection |
-| `TRACK_CONF_THRESHOLD` | 0.1 | Confidence threshold fed into ByteTrack for video (lower, so ByteTrack's own two-tier logic can work) |
-| `IMG_SIZE` | 1280 | Inference resolution for both images and video |
-| `NMS_IOU` | 0.5 | NMS IoU threshold for both `predict()` and `track()` |
-| `STITCH_MAX_DIST_PX` | 65 | Max pixel distance to merge two track fragments without pose data |
-| `STITCH_HOLDER_MAX_DIST_PX` / `STITCH_HOLDER_MAX_GAP_FRAMES` | 400 / 150 | Looser merge distance/gap allowed when both fragments were held by the same pose-tracked person |
-| `HOLDER_BBOX_MARGIN` / `_HOLDER_MIN_BOX_PX` | 2.2 / 70 | Expansion margin and minimum size (px) of the mouth/hand "hold region" boxes used by `require_human` |
+| Constant                                                     | Value     | Purpose                                                                                               |
+| ------------------------------------------------------------ | --------- | ----------------------------------------------------------------------------------------------------- |
+| `CONF_THRESHOLD`                                             | 0.25      | Confidence threshold for single-image detection                                                       |
+| `TRACK_CONF_THRESHOLD`                                       | 0.1       | Confidence threshold fed into ByteTrack for video (lower, so ByteTrack's own two-tier logic can work) |
+| `IMG_SIZE`                                                   | 1280      | Inference resolution for both images and video                                                        |
+| `NMS_IOU`                                                    | 0.5       | NMS IoU threshold for both `predict()` and `track()`                                                  |
+| `STITCH_MAX_DIST_PX`                                         | 65        | Max pixel distance to merge two track fragments without pose data                                     |
+| `STITCH_HOLDER_MAX_DIST_PX` / `STITCH_HOLDER_MAX_GAP_FRAMES` | 400 / 150 | Looser merge distance/gap allowed when both fragments were held by the same pose-tracked person       |
+| `HOLDER_BBOX_MARGIN` / `_HOLDER_MIN_BOX_PX`                  | 2.2 / 70  | Expansion margin and minimum size (px) of the mouth/hand "hold region" boxes used by `require_human`  |
 
 ## Outputs and Troubleshooting
 
@@ -109,9 +111,9 @@ These are Python constants in [`model/detector.py`](Flask_UI/model/detector.py) 
 - **Video result:** `results/<uid>_result.mp4` (raw) and, if the ffmpeg re-encode succeeds, `results/<uid>_web.mp4` (browser-playable) — the UI serves whichever one succeeded. JSON response: `{"total_frames", "frames_with_smoking", "total_detections", "unique_smokers"}`.
   - **`unique_smokers` is the number of distinct stitched ByteTrack cigarette tracks**, not an independently verified count of unique people — for example, two people who are never tracked simultaneously but whose cigarettes get merged by the ID-stitching heuristic would undercount.
 - **Common issues:**
-  - *Model file not found* — ensure `Model/weights/best.pt` exists relative to the project root (already included in this repo).
-  - *Video plays with no sound / won't play in-browser* — ffmpeg wasn't found; the raw `mp4v` file was served instead (see [Installation](#installation-and-execution)).
-  - *Pose gating misses a smoker* — pose estimation needs a reasonably visible mouth/hand; heavy occlusion, extreme angles, or multiple overlapping people can cause misses.
+  - _Model file not found_ — ensure `Model/weights/best.pt` exists relative to the project root (already included in this repo).
+  - _Video plays with no sound / won't play in-browser_ — ffmpeg wasn't found; the raw `mp4v` file was served instead (see [Installation](#installation-and-execution)).
+  - _Pose gating misses a smoker_ — pose estimation needs a reasonably visible mouth/hand; heavy occlusion, extreme angles, or multiple overlapping people can cause misses.
 
 ## Development and Testing
 

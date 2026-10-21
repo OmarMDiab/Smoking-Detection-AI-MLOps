@@ -13,24 +13,7 @@ This separation lets the small, CPU-only-capable web tier and the heavy, GPU-hun
 
 ## Deployment Architecture
 
-```mermaid
-flowchart LR
-    User["User's Browser"] -->|"HTTP :5000 published"| UI
-
-    subgraph Network["Docker Compose network - internal bridge"]
-        UI["flask_ui container<br/>app.py, templates, static<br/>no model code"]
-        Worker["ai_worker container<br/>worker_app.py FastAPI<br/>detector.py: YOLO26s + ByteTrack + MediaPipe Pose"]
-        UI -->|"HTTP :8001 internal<br/>infer/image, infer/video, infer/jobs"| Worker
-    end
-
-    Vol[("shared volume<br/>./data to /data")]
-    Weights[("Model/weights<br/>read-only mount")]
-
-    UI --- Vol
-    Worker --- Vol
-    Weights --> Worker
-    Worker -.->|"future work:<br/>expose externally"| Ext["other external services"]
-```
+![Docker Compose deployment architecture: browser to flask_ui to ai_worker over an internal network, shared data volume, read-only model mount, GPU passthrough](../Assets/Linux%20Docker%20Compose%20AI%20Architecture.png)
 
 - `flask_ui`: image `python:3.11-slim`, port `5000` published to the host.
 - `ai_worker`: image `python:3.11-slim` with PyTorch/Ultralytics/MediaPipe installed; port `8001` is only `expose`d (internal to the Compose network, not published to the host).

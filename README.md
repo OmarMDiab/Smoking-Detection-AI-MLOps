@@ -28,17 +28,11 @@ The repository contains two parallel implementations of the same detection pipel
 
 Both variants implement the same conceptual pipeline; they differ only in _where_ the code runs (see the linked docs for the exact process/container diagrams).
 
-```mermaid
-flowchart LR
-    W["Flask web UI"] --> A["Image or video<br/>upload / CCTV clip"]
-    A --> B["YOLO26s<br/>cigarette detection"]
-    B --> C["ByteTrack<br/>tracking (video only)"]
-    C --> D{"Require-human<br/>toggle (optional)"}
-    D -->|"on"| E["MediaPipe Pose<br/>keep human-held only"]
-    D -->|"off"| F["Annotated output<br/>+ detection stats"]
-    E --> F
-    F --> W
-```
+![YOLO26s detection, ByteTrack ID, and MediaPipe Pose skeleton overlay on the same frame](Assets/Adding_tracker_and_mediapipe.png)
+
+_Left: raw YOLO26s detection. Right: the same detection with a persistent ByteTrack ID and the optional MediaPipe Pose skeleton overlay used for "require human" gating._
+
+Flow: an image or video (upload / CCTV clip) is detected by YOLO26s → tracked across frames by ByteTrack (video only) → optionally filtered to human-held detections by MediaPipe Pose → returned as annotated output + detection stats through the Flask web UI.
 
 No database, message queue, or external API is used by either variant — detections are returned as JSON/annotated media, and in the Deployment variant, job progress lives in-process (see its [limitations](Smoking_detection_Deployment/README.md#current-limitations-and-future-deployment-improvements)).
 
@@ -55,6 +49,10 @@ No database, message queue, or external API is used by either variant — detect
 | **PyTorch & Ultralytics**                                      | Underlying training/inference runtime for YOLO26s (the `ultralytics` package); FP16 inference is used automatically when a CUDA GPU is available.                                                                                                                                                                                                                                                                                                                                                   |
 | **ffmpeg**                                                     | Re-encodes the raw OpenCV video output to a browser-playable H.264/AAC `.mp4`; if it's unavailable, the app falls back to serving the raw file directly instead of failing.                                                                                                                                                                                                                                                                                                                         |
 | **Docker & Docker Compose** _(Deployment only)_                | Packages `Flask_UI` and `AI_Worker` as separate services with their own dependencies, a shared data volume, and an isolated internal network.                                                                                                                                                                                                                                                                                                                                                       |
+
+![Official Ultralytics YOLO26 family benchmark: COCO mAP50-95 vs T4 TensorRT FP16 latency, compared against prior YOLO generations and other real-time detectors](Assets/mAP%20comparison%20%28yolo%20models%29.jpg)
+
+_Ultralytics' own published COCO benchmark (not project-specific) — shown here only as context for picking the YOLO26s scale, not as evidence it outperforms every detector on every task._
 
 ## Model Training & Evaluation
 
