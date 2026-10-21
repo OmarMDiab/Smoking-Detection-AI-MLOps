@@ -15,9 +15,9 @@ Smoking near fuel or process equipment is a safety hazard on industrial sites, a
 
 ## Architecture
 
-![YOLO26s + ByteTrack + MediaPipe Pose pipeline](Assets/Adding_tracker_and_mediapipe.png)
-
 Image/video → YOLO26s detects → ByteTrack tracks (video) → optional MediaPipe Pose filters to human-held detections → annotated output via the Flask web UI.
+
+![Detection only (left) vs. detection + ByteTrack + MediaPipe Pose (right)](Assets/Adding_tracker_and_mediapipe.png)
 
 ## Why These Technologies
 
@@ -38,6 +38,8 @@ _Ultralytics' official COCO benchmark — context for the YOLO26s pick._
 ## Model Training & Evaluation
 
 Fine-tuned `yolo26s.pt` in the [training notebook](Yolo26s%20Training%20%28kaggle%29.ipynb), on Kaggle (2 GPUs).
+
+![Dataset overview](Assets/Dataset_overview.png)
 
 |            |                                                                                                                                                           |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |

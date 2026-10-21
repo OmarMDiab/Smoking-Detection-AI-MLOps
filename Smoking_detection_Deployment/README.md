@@ -45,16 +45,11 @@ Open http://localhost:5000, upload an image/video, optionally enable "Only count
 - GPU errors → missing/misconfigured NVIDIA Container Toolkit.
 - No sound/won't play → ffmpeg re-encode failed, check `ai_worker` logs.
 
-## Data & Security
+## Data
 
 - `best.pt` and `./data` are bind mounts, not baked into images — persisted on the host.
 - Job progress is in-memory in a single `ai_worker` process (`--workers 1`); scaling needs a shared store (e.g. Redis).
-- No auth, no HTTPS/TLS, `flask_ui` runs with `debug=True`, extension-only upload validation, no concurrency cap — add these before any network-exposed deployment.
 
 ## Updating
 
 Replace `Model/weights/best.pt` + `docker compose restart ai_worker` (no rebuild needed). Code changes: `docker compose up --build`.
-
-## Limitations
-
-Same as the [root README](../README.md#limitations--future-work), plus: no auth/TLS, single-process job store, no CPU-only compose fallback.
