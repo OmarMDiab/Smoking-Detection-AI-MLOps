@@ -153,16 +153,9 @@ Full setup, configuration, and troubleshooting details are in the linked [Protot
 - Evaluate performance on representative industrial/petroleum-site CCTV footage — training/validation data has not been shown to be representative of real deployment cameras.
 - Expose `AI_Worker` to other external services, as already noted as a future direction on the deployment architecture diagram.
 
-## License
-
-[MIT License](LICENSE), Copyright (c) 2026 Omar Diab.
-
-## Acknowledgments & References
-
-This project fine-tunes and integrates several third-party models and libraries; it does not claim to have developed them:
+## References
 
 - [Ultralytics YOLO26](https://docs.ultralytics.com/models/yolo26/) ([paper](https://arxiv.org/abs/2606.03748)) — base detector architecture and training framework ([ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)).
 - [ByteTrack](https://github.com/FoundationVision/ByteTrack) ([paper](https://arxiv.org/abs/2110.06864)) — multi-object tracking algorithm.
 - [MediaPipe Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker) — body pose estimation.
 - [PyTorch](https://pytorch.org/), [Flask](https://flask.palletsprojects.com/), [FastAPI](https://fastapi.tiangolo.com/), [OpenCV](https://opencv.org/), [Docker Compose](https://docs.docker.com/compose/).
-- Training dataset: a single-class `cigarette-detection` dataset (Kaggle, owner `omarmdiab`), referenced by its Kaggle input path in the training notebook.
