@@ -1,4 +1,4 @@
-# Smoking Detection — AI MLOps Project
+# Smoking Detection: AI & MLOps Project
 
 Computer-vision proof of concept for detecting cigarettes in industrial CCTV footage: custom-trained **YOLO26s** + **ByteTrack** tracking + optional **MediaPipe Pose** gating.
 
