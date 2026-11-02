@@ -15,7 +15,9 @@ Smoking near fuel or process equipment is a safety hazard on industrial sites, a
 
 ## Architecture
 
-Image/video → YOLO26s detects → ByteTrack tracks (video) → optional MediaPipe Pose filters to human-held detections.
+![Deployment architecture](Assets/Linux%20Docker%20Compose%20AI%20Architecture.png)
+
+#### Image/video → YOLO26s detects → ByteTrack tracks (video) → optional MediaPipe Pose filters to human-held detections.
 
 ![Detection only (left) vs. detection + ByteTrack + MediaPipe Pose (right)](Assets/Adding_tracker_and_mediapipe.png)
 
