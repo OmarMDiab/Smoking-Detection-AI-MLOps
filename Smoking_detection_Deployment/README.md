@@ -1,9 +1,9 @@
-# Smoking Detection — Deployment
+# Smoking Detection: Deployment
 
 Containerized version of the pipeline: two Docker Compose services. See the [root](../README.md) and [Prototype](../Smoking_Detection_Prototype/README.md) docs.
 
-- **`flask_ui`** — thin Flask web app + API proxy, no model code.
-- **`ai_worker`** — FastAPI service running YOLO26s/ByteTrack/MediaPipe + the ffmpeg re-encode.
+- **`flask_ui`**: thin Flask web app + API proxy, no model code.
+- **`ai_worker`**: FastAPI service running YOLO26s/ByteTrack/MediaPipe + the ffmpeg re-encode.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ Open http://localhost:5000, upload an image/video, optionally enable "Only count
 
 ## Data
 
-- `best.pt` and `./data` are bind mounts, not baked into images — persisted on the host.
+- `best.pt` and `./data` are bind mounts, not baked into images (persisted on the host).
 - Job progress is in-memory in a single `ai_worker` process (`--workers 1`); scaling needs a shared store (e.g. Redis).
 
 ## Updating
