@@ -15,7 +15,7 @@ Smoking near fuel or process equipment is a safety hazard on industrial sites, a
 
 ## Architecture
 
-Image/video → YOLO26s detects → ByteTrack tracks (video) → optional MediaPipe Pose filters to human-held detections → annotated output via the Flask web UI.
+Image/video → YOLO26s detects → ByteTrack tracks (video) → optional MediaPipe Pose filters to human-held detections.
 
 ![Detection only (left) vs. detection + ByteTrack + MediaPipe Pose (right)](Assets/Adding_tracker_and_mediapipe.png)
 
@@ -23,7 +23,7 @@ Image/video → YOLO26s detects → ByteTrack tracks (video) → optional MediaP
 
 | Tech                                                           | Role                                                                                                                              |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **[YOLO26s](https://docs.ultralytics.com/models/yolo26/)**     | Single-class `cigarette` detector; "s" scale balances accuracy/latency (see [small objects](#small-object-detection)).            |
+| **[YOLO26s](https://docs.ultralytics.com/models/yolo26/)**     | Cigarettes are tiny in CCTV footage (many boxes <70px) and easily hidden by hands/smoke. YOLO26's **STAL** (Small-Target-Aware Label Assignment) keeps small-object supervision during training.            |
 | **[ByteTrack](https://github.com/FoundationVision/ByteTrack)** | Tracks cigarettes across frames so one isn't double-counted.                                                                      |
 | **MediaPipe Pose**                                             | Optional "require human" gate — keeps detections near a tracked person's mouth/hands. `hand_landmarker.task` ships but is unused. |
 | **Flask / FastAPI**                                            | Web UI + API (`Flask_UI`); `AI_Worker`'s internal inference API (Deployment only).                                                |
@@ -48,18 +48,6 @@ Fine-tuned `yolo26s.pt` in the [training notebook](Yolo26s%20Training%20%28kaggl
 | Epochs     | 60 max, early-stopped at **37**                                                                                                                           |
 | Model      | ~9.5M params, 20.8 GFLOPs                                                                                                                                 |
 
-| Metric    | Value                                        |
-| --------- | -------------------------------------------- |
-| Precision | 0.822                                        |
-| Recall    | 0.794                                        |
-| mAP@50    | 0.838                                        |
-| mAP@50–95 | 0.495                                        |
-| Inference | 5.0 ms/image (forward pass, Kaggle notebook) |
-
-## Small-Object Detection
-
-Cigarettes are tiny in CCTV footage (many boxes <70px) and easily hidden by hands/smoke. YOLO26's **STAL** (Small-Target-Aware Label Assignment) keeps small-object supervision during training; inference also runs at 1280px for extra pixels per cigarette.
-
 ## Repository Structure
 
 ```
@@ -69,7 +57,6 @@ Cigarettes are tiny in CCTV footage (many boxes <70px) and easily hidden by hand
 ├── Smoking_detection_Deployment/    # Flask_UI + AI_Worker (Docker Compose)
 ├── Testing_Samples/                 # sample images/videos
 ├── Yolo26s Training (kaggle).ipynb
-├── LICENSE
 └── .gitignore
 ```
 
@@ -82,19 +69,3 @@ cd Smoking_Detection_Prototype/Flask_UI && pip install -r requirements.txt && py
 # Deployment
 cd Smoking_detection_Deployment && docker compose up --build
 ```
-
-Both serve on http://localhost:5000. Weights are already included. See [Prototype](Smoking_Detection_Prototype/README.md) / [Deployment](Smoking_detection_Deployment/README.md) docs for details.
-
-## Limitations & Future Work
-
-- Larger variants (YOLO26m/l), higher-res training (960px)
-- Fewer false positives on pipes/pens/lighters
-- Temporal-consistency gating before alerting
-- Validate on real petroleum/industrial footage
-- Expose `AI_Worker` externally
-
-## References
-
-[YOLO26](https://docs.ultralytics.com/models/yolo26/) · [ByteTrack](https://github.com/FoundationVision/ByteTrack) · [MediaPipe Pose](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker) · [PyTorch](https://pytorch.org/) · [Flask](https://flask.palletsprojects.com/) · [FastAPI](https://fastapi.tiangolo.com/) · [OpenCV](https://opencv.org/) · [Docker Compose](https://docs.docker.com/compose/)
-
-[MIT License](LICENSE) — Copyright (c) 2026 Omar Diab.
