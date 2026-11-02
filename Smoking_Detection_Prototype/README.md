@@ -1,6 +1,6 @@
-# Smoking Detection — Prototype
+# Smoking Detection: Prototype
 
-Single-process Flask app running the full pipeline in-process — the dev/experimentation variant. See the [root](../README.md) and [Deployment](../Smoking_detection_Deployment/README.md) docs.
+Single-process Flask app running the full pipeline dev/experimentation variant. See the [root](../README.md) and [Deployment](../Smoking_detection_Deployment/README.md) docs.
 
 ## Pipeline
 
@@ -39,8 +39,6 @@ cd Smoking_Detection_Prototype/Flask_UI
 pip install -r requirements.txt
 python app.py
 ```
-
-Open http://localhost:5000. Weights included; `bin/ffmpeg.exe` isn't (falls back to `PATH`). 500MB upload limit.
 
 ## Outputs
 
