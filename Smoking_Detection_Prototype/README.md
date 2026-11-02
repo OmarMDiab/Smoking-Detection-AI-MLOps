@@ -10,8 +10,6 @@ Single-process Flask app running the full pipeline dev/experimentation variant. 
 4. **Pose gate** (optional) — `require_human` keeps only detections near a person's mouth/hand.
 5. **Draw**, ffmpeg re-encode (video), save to `results/`.
 
-![Detection only (left) vs. detection + ByteTrack + MediaPipe Pose (right)](../Assets/Adding_tracker_and_mediapipe.png)
-
 ## Model
 
 |                   |                                                  |
